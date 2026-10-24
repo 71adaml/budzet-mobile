@@ -114,6 +114,18 @@ export const DEFAULT_PROFILES = [
   }),
 ];
 
+// Profile tylko dla wersji na telefon (nie są zapisywane w bazie, bo program na
+// komputer nie zna ustawień "auto").
+export const MOBILE_PROFILES = [
+  // PKO BP (iPKO → Historia → Pobierz CSV): Data operacji, Data waluty, Typ transakcji,
+  // Kwota, Waluta, Saldo po transakcji, Opis transakcji (+ kilka kolumn bez nazwy).
+  profile({
+    name: "PKO BP", separator: "auto", encoding: "auto", skip_rows: 1, decimal_comma: "auto",
+    date_col: 0, date_fallback_col: 1, desc_cols: [6, 7, 8, 9, 10, 11, 2], amount_col: 3,
+    desc_clean: "pko",
+  }),
+];
+
 const IN_SPAN = "t.date BETWEEN ? AND ?";
 const HAS_SPLITS = "EXISTS (SELECT 1 FROM transaction_splits s WHERE s.transaction_id = t.id)";
 const EXPENSE_ROW = "((c.id IS NOT NULL AND c.is_income = 0) OR (c.id IS NULL AND t.amount < 0))";

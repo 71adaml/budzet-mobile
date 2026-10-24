@@ -1,6 +1,6 @@
 // Działanie bez internetu: pliki aplikacji trzymane w pamięci podręcznej.
 // Przy każdej nowej wersji zmień VERSION, żeby telefon pobrał nowe pliki.
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 const CACHE = `budzet-${VERSION}`;
 const FILES = [
   "./", "index.html", "manifest.webmanifest", "css/app.css",

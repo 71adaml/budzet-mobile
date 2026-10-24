@@ -18,6 +18,7 @@ const ENCODINGS = { "utf-8-sig": "utf-8", "utf-8": "utf-8", cp1250: "windows-125
 export const DESCRIPTION_SEPARATOR = " · ";
 
 export function decodeBytes(bytes, encoding) {
+  if (encoding === "auto") return decodeAuto(bytes).text;
   const label = ENCODINGS[encoding] || encoding;
   try {
     return new TextDecoder(label, { fatal: true }).decode(bytes);
@@ -184,7 +185,8 @@ export async function parseRows(rows, profile) {
     if (profile.invert_sign) amount = -amount;
     const incomeCols = profile.income_desc_cols || [];
     const columns = amount > 0 && incomeCols.length ? incomeCols : profile.desc_cols;
-    const description = buildDescription(cells, columns) || "(brak opisu)";
+    const source = profile.desc_clean === "pko" ? cells.map(cleanPkoCell) : cells;
+    const description = buildDescription(source, columns) || "(brak opisu)";
     const fixed = groszeToFixed(amount);
     const key = `${when}|${fixed}|${normalize(description)}`;
     const occurrence = (seen.get(key) || 0) + 1;
@@ -197,10 +199,32 @@ export async function parseRows(rows, profile) {
   return result;
 }
 
-/** Parsuje plik (bajty) wg profilu. */
+/** Parsuje plik (bajty) wg profilu. Profil może mieć separator i przecinek dziesiętny "auto". */
 export async function parseFile(bytes, profile) {
   const text = decodeBytes(bytes, profile.encoding);
-  return parseRows(readRawRows(text, profile), profile);
+  const resolved = { ...profile };
+  if (resolved.separator === "auto") resolved.separator = guessSeparator(text);
+  let rows = readRawRows(text, resolved);
+  if (resolved.decimal_comma === "auto") {
+    const sample = rows.slice(0, 50).map(([, c]) => (c[resolved.amount_col] || "").trim()).filter(Boolean);
+    resolved.decimal_comma = sample.some((v) => /,\d{1,2}(\s*\D*)?$/.test(v))
+      || !sample.some((v) => /\.\d{1,2}(\s*\D*)?$/.test(v));
+  }
+  return parseRows(rows, resolved);
+}
+
+// PKO BP: kolumny opisu mają przedrostki ("Tytuł: ", "Nazwa odbiorcy: ", "Lokalizacja: Adres: ")
+// i sporo technicznych danych (numer karty, rachunki, oryginalna kwota) – zostawiamy to, co czytelne.
+const PKO_DROP = /^(Data wykonania|Data i czas operacji|Oryginalna kwota|Kwota|Numer karty|Numer telefonu|Rachunek (odbiorcy|nadawcy)|Adres (odbiorcy|nadawcy)|Numer referencyjny|Referencje|Operacja:|Identyfikator)/i;
+
+export function cleanPkoCell(value) {
+  let v = String(value || "").trim();
+  if (!v || PKO_DROP.test(v)) return "";
+  v = v.replace(/^Lokalizacja:\s*/i, "").replace(/^Adres:\s*/i, "")
+    .replace(/^(Tytuł|Tytul|Nazwa odbiorcy|Nazwa nadawcy|Odbiorca|Nadawca):\s*/i, "");
+  v = v.replace(/\s+Kraj:.*$/i, "").replace(/\s+Miasto:\s*/i, ", ");
+  if (/^[\d\s/-]+$/.test(v)) return ""; // sam numer (np. tytuł płatności kartą)
+  return v;
 }
 
 /** Wybiera profil, z którym plik daje najwięcej poprawnych wierszy. */
@@ -212,4 +236,67 @@ export async function parseWithBestProfile(bytes, profiles) {
     if (!best || result.rows.length > best.result.rows.length) best = { profile, result };
   }
   return best;
+}
+
+// ------------------------------------------------- rozpoznawanie innych banków
+// Gdy żaden zapisany profil nie pasuje, szukamy wiersza nagłówka (np. "Data operacji",
+// "Kwota", "Opis") i na jego podstawie budujemy profil. Działa dla większości polskich banków.
+
+const DESC_HEADER = /opis|tytu|odbiorc|nadawc|kontrahent|szczeg|nazwa|miejsce/;
+const NOT_DESC = /nazwa banku|rachun|konta|numer|nr |adres|waluta|saldo|kwota|data|kategori/;
+
+function headerKey(cell) {
+  return normalize(cell.replace(/^#/, "")).toLowerCase();
+}
+
+function guessSeparator(text) {
+  const sample = text.split(/\r?\n/).slice(0, 60).join("\n");
+  const counts = [";", ",", "\t"].map((s) => [s, sample.split(s).length]);
+  counts.sort((a, b) => b[1] - a[1]);
+  return counts[0][0];
+}
+
+function decodeAuto(bytes) {
+  try {
+    return { text: new TextDecoder("utf-8", { fatal: true }).decode(bytes), encoding: "utf-8-sig" };
+  } catch {
+    return { text: new TextDecoder("windows-1250").decode(bytes), encoding: "cp1250" };
+  }
+}
+
+/** Buduje profil na podstawie nagłówka pliku albo zwraca null. */
+export function detectProfile(bytes) {
+  const { text, encoding } = decodeAuto(bytes);
+  const separator = guessSeparator(text);
+  const records = parseCsv(text, separator).slice(0, 80);
+  for (let i = 0; i < records.length; i++) {
+    const keys = records[i].map(headerKey);
+    const dateCols = keys.map((k, idx) => [k, idx]).filter(([k]) => /^data/.test(k));
+    const amountCols = keys.map((k, idx) => [k, idx]).filter(([k]) => /kwota|obciazen|uznani|amount/.test(k) && !/saldo|blokad|walucie|oryginal/.test(k));
+    if (!dateCols.length || !amountCols.length) continue;
+    const data = records.slice(i + 1, i + 40).filter((r) => r.length >= keys.length - 1);
+    const valid = (idx, test) => data.filter((r) => r[idx] && test(r[idx].trim())).length;
+    const isDate = (v) => { try { parseDate(v, "auto"); return true; } catch { return false; } };
+    const isAmount = (v) => /^[+-]?[\d\s .,']+\d(\s*(PLN|ZŁ|ZL))?$/i.test(v);
+    // Data: najpierw data operacji/transakcji, potem księgowania.
+    const rank = (k) => (/operacji|transakcji/.test(k) ? 0 : /ksiegow/.test(k) ? 1 : 2);
+    const dates = dateCols.filter(([, idx]) => valid(idx, isDate) > 0).sort((a, b) => rank(a[0]) - rank(b[0]));
+    const amounts = amountCols.filter(([, idx]) => valid(idx, isAmount) > 0)
+      .sort((a, b) => valid(b[1], isAmount) - valid(a[1], isAmount));
+    if (!dates.length || !amounts.length) continue;
+    const amountCol = amounts[0][1];
+    const sample = data.map((r) => (r[amountCol] || "").trim()).filter(Boolean);
+    const decimalComma = sample.some((v) => /,\d{1,2}(\s*\D*)?$/.test(v)) || !sample.some((v) => /\.\d{1,2}(\s*\D*)?$/.test(v));
+    const fallback = dates.find(([k]) => /ksiegow/.test(k) && k !== dates[0][0]);
+    const descCols = keys.map((k, idx) => [k, idx])
+      .filter(([k]) => DESC_HEADER.test(k) && !NOT_DESC.test(k)).map(([, idx]) => idx);
+    if (!descCols.length) continue;
+    return {
+      name: "Rozpoznany automatycznie", separator, encoding, skip_rows: i + 1, date_format: "auto",
+      decimal_comma: decimalComma, invert_sign: false, date_col: dates[0][1], desc_cols: descCols,
+      amount_col: amountCol, income_desc_cols: [],
+      date_fallback_col: fallback ? fallback[1] : -1, fallback_after_days: 0,
+    };
+  }
+  return null;
 }

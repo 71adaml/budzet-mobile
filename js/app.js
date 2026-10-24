@@ -1,7 +1,7 @@
 // Budżet domowy – wersja na iPhone. Interfejs aplikacji.
 
-import { Repository, DEFAULT_PROFILES, UNCATEGORIZED, UserError } from "./db.js";
-import { parseWithBestProfile } from "./importer.js";
+import { Repository, DEFAULT_PROFILES, MOBILE_PROFILES, UNCATEGORIZED, UserError } from "./db.js";
+import { parseWithBestProfile, detectProfile } from "./importer.js";
 import { suggestKeyword } from "./categorizer.js";
 import * as store from "./store.js";
 import {
@@ -10,7 +10,7 @@ import {
   formatNumber,
 } from "./format.js";
 
-export const APP_VERSION = "1.0.0";
+export const APP_VERSION = "1.1.0";
 
 const state = {
   SQL: null,
@@ -305,14 +305,14 @@ function renderImport() {
   html += `
     <label class="btn primary big file-btn">Wybierz plik CSV<input type="file" id="csv-file"></label>
     <div class="card help">
-      <b>Jak pobrać wyciąg z Credit Agricole na iPhonie</b>
+      <b>Jak pobrać wyciąg na iPhonie</b>
       <ol>
-        <li>Otwórz w Safari serwis CA24 i zaloguj się.</li>
-        <li>Wejdź w historię rachunku, wybierz okres i eksport do pliku CSV.</li>
+        <li>Otwórz w Safari stronę swojego banku i zaloguj się.</li>
+        <li>Wejdź w historię rachunku, wybierz okres i eksport (pobranie) do pliku CSV.</li>
         <li>Plik zapisze się w aplikacji Pliki (folder Pobrane).</li>
         <li>Wróć tutaj, stuknij „Wybierz plik CSV” i wskaż ten plik.</li>
       </ol>
-      <p class="sub">Możesz importować ten sam wyciąg wiele razy – transakcje, które już są w bazie, zostaną pominięte (także te zaimportowane na komputerze).</p>
+      <p class="sub">Aplikacja sama rozpoznaje plik z Credit Agricole i z większości innych banków (po nazwach kolumn). Możesz importować ten sam wyciąg wiele razy – transakcje, które już są w bazie, zostaną pominięte (także te zaimportowane na komputerze).</p>
     </div>`;
   return html;
 }
@@ -322,10 +322,13 @@ const pickCsv = guarded(async (file) => {
   const repo = state.repo;
   const saved = repo.listProfiles();
   const names = new Set(saved.map((x) => x.name));
-  const profiles = [...saved, ...DEFAULT_PROFILES.filter((x) => !names.has(x.name)), ...DEFAULT_PROFILES];
+  const profiles = [...saved, ...DEFAULT_PROFILES.filter((x) => !names.has(x.name)), ...DEFAULT_PROFILES,
+    ...MOBILE_PROFILES];
+  const detected = detectProfile(bytes);
+  if (detected) profiles.push(detected);
   const best = await parseWithBestProfile(bytes, profiles);
   if (!best || !best.result.rows.length) {
-    throw new UserError("Nie rozpoznano transakcji w tym pliku. Czy to eksport CSV z CA24?");
+    throw new UserError("Nie rozpoznano transakcji w tym pliku. Czy to eksport historii rachunku do CSV?");
   }
   const names2 = Object.fromEntries(repo.listCategories().map((c) => [c.id, c.name]));
   state.pendingImport = { fileName: file.name, profile: best.profile, result: best.result,

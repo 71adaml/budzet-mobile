@@ -14,11 +14,16 @@ kategorie i budżety są zapisane w pamięci iPhone'a i nigdzie nie są wysyłan
 
 ## Co potrafi
 
-- Import wyciągu CSV z Credit Agricole (CA24) z automatycznymi kategoriami (te same reguły co na komputerze).
+- Import wyciągu CSV z Credit Agricole (CA24) i PKO BP; inne banki (np. mBank, ING) rozpoznawane automatycznie po nazwach kolumn.
+- Automatyczne kategorie (te same reguły co na komputerze).
 - Podsumowanie miesiąca, wydatki wg kategorii, prognoza na koniec miesiąca, wykres 6 miesięcy.
 - Lista transakcji z wyszukiwaniem, zmiana kategorii, notatki, nowe reguły.
 - Budżety (limity na kategorie) z kopiowaniem z poprzedniego miesiąca.
 - Ten sam plik bazy `budget.db` co program na Windows – można przenosić dane w obie strony.
+
+## Dla innej osoby
+
+Wystarczy wysłać link. Każdy telefon ma własną, osobną bazę – nikt nie widzi cudzych transakcji.
 
 ## Synchronizacja z komputerem
 
@@ -35,6 +40,8 @@ oznacza zmiany w telefonie, których jeszcze nie zapisano do pliku.
 Czysty HTML/CSS/JS bez kompilacji, baza SQLite przez [sql.js](https://github.com/sql-js/sql.js) (MIT, w `vendor/`).
 Logika w `js/` odpowiada modułom `logic/` programu na Windows (schemat bazy w wersji 4).
 Przy każdej zmianie plików podbij `VERSION` w `sw.js` i `APP_VERSION` w `js/app.js`.
+
+Test innych banków: `node tests/banks.test.mjs`.
 
 Test zgodności z programem na Windows (wymaga Node i kodu programu):
 
