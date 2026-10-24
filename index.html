@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Budżet domowy</title>
+  <meta name="description" content="Budżet domowy – wersja na iPhone. Dane zostają w telefonie.">
+  <meta name="theme-color" content="#1f6f4a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Budżet">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1 id="title">Budżet domowy</h1>
+    <span id="sync-dot" class="sync-dot" title="Są zmiany niezapisane do pliku" hidden></span>
+    <div id="month-bar" class="month-bar" hidden>
+      <button data-action="prev-month" aria-label="Poprzedni miesiąc">‹</button>
+      <span id="month-label"></span>
+      <button data-action="next-month" aria-label="Następny miesiąc">›</button>
+    </div>
+  </header>
+
+  <main id="view"><div class="empty">Wczytywanie…</div></main>
+
+  <nav class="tabbar">
+    <button data-view="summary"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Podsumowanie</button>
+    <button data-view="transactions"><svg viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Transakcje</button>
+    <button data-view="import"><svg viewBox="0 0 24 24"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 21h16"/></svg>Import</button>
+    <button data-view="budgets"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>Budżety</button>
+    <button data-view="more"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>Więcej</button>
+  </nav>
+
+  <div id="sheet" class="sheet" hidden>
+    <div class="sheet-backdrop" data-action="close-sheet"></div>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <div class="sheet-head"><h3 id="sheet-title"></h3><button class="icon-btn" data-action="close-sheet" aria-label="Zamknij">✕</button></div>
+      <div id="sheet-body"></div>
+    </div>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="vendor/sql-wasm.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
