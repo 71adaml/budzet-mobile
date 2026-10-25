@@ -10,7 +10,7 @@ import {
   formatNumber,
 } from "./format.js";
 
-export const APP_VERSION = "1.1.0";
+export const APP_VERSION = "1.2.0";
 
 const state = {
   SQL: null,
@@ -25,6 +25,36 @@ const state = {
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
+
+const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
+  || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isInstalled = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+let installPrompt = null; // Android/Chrome: zdarzenie instalacji
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPrompt = event;
+  if (state.repo && state.view === "more") render();
+});
+window.addEventListener("appinstalled", () => {
+  installPrompt = null;
+  toast("Aplikacja zainstalowana – uruchamiaj ją z ikony „Budżet”.", "good");
+  if (state.repo) render();
+});
+
+function installCard() {
+  if (isInstalled()) return "";
+  if (installPrompt) {
+    return `<div class="card help"><b>Zainstaluj aplikację</b>
+      <p class="sub">Dostaniesz ikonę „Budżet” na ekranie głównym, a dane będą trwale zapisane w telefonie.</p>
+      <button class="btn primary" data-action="install">Zainstaluj aplikację</button></div>`;
+  }
+  const how = IS_IOS
+    ? "W Safari stuknij Udostępnij (kwadrat ze strzałką) → „Dodaj do ekranu początkowego”."
+    : "W Chrome stuknij menu ⋮ → „Zainstaluj aplikację” (albo „Dodaj do ekranu głównego”).";
+  return `<div class="card help"><b>Zainstaluj aplikację</b><p class="sub">${how}
+    Uruchamiaj ją potem z ikony „Budżet” – tylko wtedy dane są trwale zapisane.</p></div>`;
+}
 
 // ----------------------------------------------------------------- start
 async function start() {
@@ -305,11 +335,11 @@ function renderImport() {
   html += `
     <label class="btn primary big file-btn">Wybierz plik CSV<input type="file" id="csv-file"></label>
     <div class="card help">
-      <b>Jak pobrać wyciąg na iPhonie</b>
+      <b>Jak pobrać wyciąg na telefonie</b>
       <ol>
-        <li>Otwórz w Safari stronę swojego banku i zaloguj się.</li>
+        <li>Otwórz w ${IS_IOS ? "Safari" : "Chrome"} stronę swojego banku i zaloguj się.</li>
         <li>Wejdź w historię rachunku, wybierz okres i eksport (pobranie) do pliku CSV.</li>
-        <li>Plik zapisze się w aplikacji Pliki (folder Pobrane).</li>
+        <li>Plik zapisze się ${IS_IOS ? "w aplikacji Pliki (folder Pobrane)" : "w folderze Pobrane (Download)"}.</li>
         <li>Wróć tutaj, stuknij „Wybierz plik CSV” i wskaż ten plik.</li>
       </ol>
       <p class="sub">Aplikacja sama rozpoznaje plik z Credit Agricole i z większości innych banków (po nazwach kolumn). Możesz importować ten sam wyciąg wiele razy – transakcje, które już są w bazie, zostaną pominięte (także te zaimportowane na komputerze).</p>
@@ -412,6 +442,7 @@ function renderMore() {
     ${!count ? `<div class="card help"><b>Witaj!</b><p>Możesz zacząć od pliku bazy z programu na komputerze
       (wtedy masz tu wszystkie transakcje, kategorie, reguły i budżety) albo od razu zaimportować wyciąg CSV.</p>
       <button class="btn primary" data-action="go" data-view="import">Importuj wyciąg CSV</button></div>` : ""}
+    ${installCard()}
     <h2>Synchronizacja z komputerem</h2>
     <div class="card">
       <div class="sub">W telefonie: ${count} ${plural(count, "transakcja", "transakcje", "transakcji")}${first ? ` (${displayDate(first)} – ${displayDate(last)})` : ""}.<br>
@@ -422,8 +453,8 @@ function renderMore() {
       <details class="sub"><summary>Jak to działa</summary>
         <p>Obie wersje używają tego samego pliku bazy <b>budget.db</b>. Na komputerze leży on w folderze
         <code>.budzet_domowy</code> w Twoim katalogu użytkownika.</p>
-        <p><b>Z komputera na telefon:</b> skopiuj budget.db do iCloud Drive lub OneDrive, a tutaj stuknij „Wczytaj bazę z pliku”.</p>
-        <p><b>Z telefonu na komputer:</b> stuknij „Zapisz kopię bazy”, wybierz „Zachowaj w Plikach” (iCloud Drive/OneDrive),
+        <p><b>Z komputera na telefon:</b> skopiuj budget.db do ${IS_IOS ? "iCloud Drive lub OneDrive" : "Google Drive lub OneDrive"} (albo przez kabel USB do folderu Pobrane), a tutaj stuknij „Wczytaj bazę z pliku”.</p>
+        <p><b>Z telefonu na komputer:</b> stuknij „Zapisz kopię bazy”, wybierz ${IS_IOS ? "„Zachowaj w Plikach” (iCloud Drive/OneDrive)" : "Dysk Google lub OneDrive (albo plik trafi do Pobranych)"},
         a na komputerze zamknij program i podmień plik budget.db.</p>
         <p>Pracuj w jednym miejscu naraz – wczytanie pliku zastępuje dane w telefonie.</p>
       </details>
@@ -452,7 +483,7 @@ function renderMore() {
     </div>
     <h2>O aplikacji</h2>
     <div class="card sub">
-      Budżet domowy na iPhone, wersja ${APP_VERSION}. Dane są zapisane tylko w tym telefonie i nigdzie nie są wysyłane.
+      Budżet domowy na telefon (iPhone i Android), wersja ${APP_VERSION}. Dane są zapisane tylko w tym telefonie i nigdzie nie są wysyłane.
       Aplikacja działa także bez internetu.
       <button class="btn danger" data-action="wipe">Usuń wszystkie dane z telefonu</button>
     </div>`;
@@ -542,18 +573,36 @@ const wipe = guarded(async () => {
   toast("Dane usunięte.");
 });
 
+async function install() {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice.catch(() => null);
+  installPrompt = null;
+  render();
+}
+
 // ----------------------------------------------------------------- sheet
+// Okienko dodaje wpis do historii, więc przycisk Wstecz (Android) je zamyka.
 function openSheet(title, body) {
   $("#sheet-title").textContent = title;
   $("#sheet-body").innerHTML = body;
+  if ($("#sheet").hidden) history.pushState({ sheet: true }, "");
   $("#sheet").hidden = false;
   requestAnimationFrame(() => $("#sheet").classList.add("open"));
 }
 
-function closeSheet() {
+function hideSheet() {
   $("#sheet").classList.remove("open");
   $("#sheet").hidden = true;
 }
+
+function closeSheet() {
+  if ($("#sheet").hidden) return;
+  hideSheet();
+  if (history.state?.sheet) history.back();
+}
+
+window.addEventListener("popstate", () => { if (!$("#sheet").hidden) hideSheet(); });
 
 // ---------------------------------------------------------------- events
 function bindView() {
@@ -630,6 +679,7 @@ function onClick(event) {
     case "del-rule": deleteRule(id); break;
     case "add-cat": addCategory(); break;
     case "wipe": wipe(); break;
+    case "install": install(); break;
     default: break;
   }
 }

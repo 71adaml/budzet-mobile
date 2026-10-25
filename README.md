@@ -1,7 +1,7 @@
-# Budżet domowy – wersja na iPhone
+# Budżet domowy – wersja na telefon (iPhone i Android)
 
-Aplikacja webowa do programu **Budżet domowy** (wersja na Windows). Instalujesz ją z Safari
-na ekranie początkowym i działa jak zwykła aplikacja, także bez internetu.
+Aplikacja webowa do programu **Budżet domowy** (wersja na Windows). Instalujesz ją z Safari (iPhone)
+albo z Chrome (Android) na ekranie głównym i działa jak zwykła aplikacja, także bez internetu.
 
 **Twoje dane zostają w telefonie.** Ta strona zawiera tylko kod aplikacji – transakcje,
 kategorie i budżety są zapisane w pamięci iPhone'a i nigdzie nie są wysyłane.
@@ -11,6 +11,13 @@ kategorie i budżety są zapisane w pamięci iPhone'a i nigdzie nie są wysyłan
 1. Otwórz w **Safari**: https://71adaml.github.io/budzet-mobile/
 2. Stuknij **Udostępnij** (kwadrat ze strzałką) → **Dodaj do ekranu początkowego**.
 3. Uruchamiaj aplikację z ikony „Budżet” (nie z Safari – tylko wtedy dane są trwale zapisane).
+
+## Instalacja na Androidzie
+
+1. Otwórz w **Chrome**: https://71adaml.github.io/budzet-mobile/
+2. Stuknij **Zainstaluj** na pasku u dołu albo menu **⋮ → Zainstaluj aplikację**
+   (w aplikacji jest też przycisk w zakładce *Więcej*).
+3. Uruchamiaj aplikację z ikony „Budżet”.
 
 ## Co potrafi
 
