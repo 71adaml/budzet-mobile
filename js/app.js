@@ -10,7 +10,7 @@ import {
   formatNumber,
 } from "./format.js";
 
-export const APP_VERSION = "1.2.0";
+export const APP_VERSION = "1.3.0";
 
 const state = {
   SQL: null,
@@ -395,8 +395,8 @@ function renderBudgets() {
     if (limit) { totalLimit += limit; totalSpent += spent; }
     const ratio = limit ? spent / limit : 0;
     const perDay = isCurrent && limit && spent < limit ? Math.floor((limit - spent) / left) : null;
-    return `<div class="budget-row">
-      <div class="cat-line"><span>${h(c.name)}</span>
+    return `<div class="budget-row" data-action="budget-cat" data-cat="${c.id}">
+      <div class="cat-line"><span class="cat-link">${h(c.name)} ›</span>
         <input class="limit-input" inputmode="decimal" data-cat="${c.id}" placeholder="bez limitu"
           value="${limit ? formatNumber(limit).replace(/ /g, " ") : ""}" aria-label="Limit ${h(c.name)}"></div>
       <div class="bar"><span class="${ratio > 1 ? "over" : ratio > 0.85 ? "warn" : ""}" style="width:${Math.min(100, ratio * 100)}%"></span></div>
@@ -410,7 +410,41 @@ function renderBudgets() {
     </div>
     <button class="btn" data-action="copy-budgets">Kopiuj limity z poprzedniego miesiąca</button>
     <div class="card list">${rows}</div>
-    <p class="sub">Wpisz limit w złotych; puste pole lub 0 usuwa limit.</p>`;
+    <p class="sub">Stuknij kategorię, żeby zobaczyć jej wydatki w tym miesiącu. Wpisz limit w złotych; puste pole lub 0 usuwa limit.</p>`;
+}
+
+function openCategoryEntries(categoryId) {
+  const repo = state.repo;
+  const category = repo.listCategories().find((c) => c.id === categoryId);
+  if (!category) return;
+  const entries = repo.categoryEntries(categoryId, monthStart(state.month), monthEnd(state.month));
+  const spent = -entries.reduce((s, e) => s + e.amount, 0);
+  let body = `<div class="sheet-amount">${formatPln(spent)}</div>
+    <div class="sub center">${monthLabel(state.month)} · ${entries.length} ${plural(entries.length, "pozycja", "pozycje", "pozycji")}</div>`;
+  if (!entries.length) {
+    body += `<div class="empty">Brak wydatków w tej kategorii w tym miesiącu.</div>`;
+  } else {
+    let day = null;
+    body += `<div class="card list">`;
+    for (const e of entries) {
+      if (e.date !== day) {
+        day = e.date;
+        body += `<div class="day">${dayHeader(e.date)}</div>`;
+      }
+      const meta = [e.part ? `<span class="chip">część podzielonej</span>` : "",
+        e.note ? `<span class="note-ico">✎ ${h(e.note)}</span>` : ""].join("");
+      body += `<button class="tx" data-action="tx" data-id="${e.id}">
+        <div class="tx-main"><div class="desc">${h(e.description)}</div>${meta ? `<div class="meta">${meta}</div>` : ""}</div>
+        <b class="${amountClass(e.amount)}">${formatPln(e.amount, true)}</b>
+      </button>`;
+    }
+    body += `</div>`;
+  }
+  body += `<div class="row-buttons">
+    <button class="btn" data-action="close-sheet">Zamknij</button>
+    <button class="btn primary" data-action="filter-cat" data-cat="${categoryId}" data-month="${state.month}">Pokaż w Transakcjach</button>
+  </div>`;
+  openSheet(category.name, body);
 }
 
 const saveLimit = guarded(async (input) => {
@@ -649,6 +683,7 @@ function onClick(event) {
   }
   const { action } = el.dataset;
   const id = Number(el.dataset.id);
+  if (action === "budget-cat" && event.target.closest("input")) return;
   switch (action) {
     case "prev-month": state.month = shiftMonth(state.month, -1); render(); break;
     case "next-month": state.month = shiftMonth(state.month, 1); render(); break;
@@ -659,6 +694,7 @@ function onClick(event) {
       render();
       break;
     case "filter-cat":
+      closeSheet();
       state.category = Number(el.dataset.cat);
       if (el.dataset.month) state.month = el.dataset.month;
       state.search = "";
@@ -673,6 +709,7 @@ function onClick(event) {
     case "import-cancel": state.pendingImport = null; render(); break;
     case "import-do": doImport(); break;
     case "copy-budgets": copyBudgets(); break;
+    case "budget-cat": openCategoryEntries(Number(el.dataset.cat)); break;
     case "export-db": exportDb(); break;
     case "add-rule": addRule(); break;
     case "apply-rules": applyRules(); break;

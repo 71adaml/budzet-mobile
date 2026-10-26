@@ -25,7 +25,7 @@ kategorie i budżety są zapisane w pamięci iPhone'a i nigdzie nie są wysyłan
 - Automatyczne kategorie (te same reguły co na komputerze).
 - Podsumowanie miesiąca, wydatki wg kategorii, prognoza na koniec miesiąca, wykres 6 miesięcy.
 - Lista transakcji z wyszukiwaniem, zmiana kategorii, notatki, nowe reguły.
-- Budżety (limity na kategorie) z kopiowaniem z poprzedniego miesiąca.
+- Budżety (limity na kategorie) z kopiowaniem z poprzedniego miesiąca; stuknięcie kategorii pokazuje jej wydatki w danym miesiącu.
 - Ten sam plik bazy `budget.db` co program na Windows – można przenosić dane w obie strony.
 
 ## Dla innej osoby
