@@ -398,6 +398,23 @@ export class Repository {
        GROUP BY t.category_id ORDER BY spent DESC`, [start, end]);
   }
 
+  /** Pozycje kategorii w okresie (te same, z których liczone są sumy), od najnowszych.
+   *  Transakcja podzielona daje tylko część przypisaną do tej kategorii. categoryId null = bez kategorii. */
+  categoryEntries(categoryId, start, end) {
+    const same = categoryId === null ? "IS NULL" : "= ?";
+    const id = categoryId === null ? [] : [categoryId];
+    return this.all(
+      `SELECT t.id, t.date, t.description, t.amount, t.note, 0 AS part
+       FROM transactions t
+       WHERE t.category_id ${same} AND ${IN_SPAN} AND NOT ${HAS_SPLITS}
+       UNION ALL
+       SELECT t.id, t.date, t.description, s.amount, s.note, 1 AS part
+       FROM transaction_splits s JOIN transactions t ON t.id = s.transaction_id
+       WHERE s.category_id ${same} AND ${IN_SPAN}
+       ORDER BY 2 DESC, 1 DESC`, [...id, start, end, ...id, start, end])
+      .map((r) => ({ ...r, note: r.note || "", part: !!r.part }));
+  }
+
   incomeByCategory(start, end) {
     return this.all(
       `SELECT t.category_id, COALESCE(c.name, 'Bez kategorii') AS name, SUM(t.amount) AS total
